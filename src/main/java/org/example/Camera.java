@@ -63,6 +63,13 @@ public class Camera implements KeyListener, MouseMotionListener {
             z -= strafeZ * speed;
         }
 
+        if (keys[KeyEvent.VK_SPACE]) { // Aufsteigen
+            y -= speed;
+        }
+        if (keys[KeyEvent.VK_SHIFT]) { // Sinken
+            y += speed;
+        }
+
         if (keys[KeyEvent.VK_RIGHT]) { // Nach rechts drehen
             yaw -= sensitivity;
         }
