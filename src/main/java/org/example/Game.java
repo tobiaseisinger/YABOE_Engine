@@ -19,8 +19,9 @@ public class Game extends JFrame implements Runnable {
         this.height = height;
         img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         pixels = ((DataBufferInt) img.getRaster().getDataBuffer()).getData();
-        camera = new Camera(0, 0, -5);
+        camera = new Camera(0, 0, -5, this);
         addKeyListener(camera);
+        addMouseMotionListener(camera);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(width, height);
         setLocationRelativeTo(null);
