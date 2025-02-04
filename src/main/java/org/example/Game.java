@@ -63,6 +63,8 @@ public class Game extends JFrame implements Runnable {
 
         Graphics g = bs.getDrawGraphics();
         g.drawImage(img, 0, 0, img.getWidth(), img.getHeight(), null);
+
+        g.dispose();
         bs.show();
     }
 
@@ -156,6 +158,36 @@ public class Game extends JFrame implements Runnable {
         }
     }
 
+    private void renderTextToPixels(String text, int x, int y, int color) {
+        BufferedImage textImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = textImage.createGraphics();
+
+        g2d.setFont(new Font("Arial", Font.PLAIN, 20));
+        g2d.setColor(Color.WHITE);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        FontMetrics fm = g2d.getFontMetrics();
+        int textX = x;
+        int textY = y + fm.getAscent();
+        g2d.drawString(text, textX, textY);
+        g2d.dispose();
+
+        int[] textPixels = ((DataBufferInt) textImage.getRaster().getDataBuffer()).getData();
+        for (int ty = 0; ty < height; ty++) {
+            for (int tx = 0; tx < width; tx++) {
+                int pixel = textPixels[ty * width + tx];
+
+                if ((pixel >> 24) != 0x00) {
+                    pixels[ty * width + tx] = color;
+                }
+            }
+        }
+    }
+
+    private void renderUI() {
+        renderTextToPixels("YABOE alpha v0.1", 10, 30, 0xFFFFFF);
+    }
+
     @Override
     public void run() {
         long lastTime = System.nanoTime();
@@ -172,6 +204,7 @@ public class Game extends JFrame implements Runnable {
                 delta--;
                 camera.update();
                 clearBackground();
+                renderUI();
             }
             render();
         }
