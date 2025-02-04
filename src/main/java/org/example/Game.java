@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
+import java.util.Arrays;
 
 public class Game extends JFrame implements Runnable {
     public int width, height;
@@ -92,10 +93,13 @@ public class Game extends JFrame implements Runnable {
 
     private void renderObject(Object obj) {
         int numVertices = obj.vertices.length;
+        if (numVertices < 3) return; // Keine gültige Fläche
+
         int[] screenX = new int[numVertices];
         int[] screenY = new int[numVertices];
         boolean[] inFront = new boolean[numVertices];
 
+        // **Schritt 1: 3D -> 2D Transformation**
         for (int i = 0; i < numVertices; i++) {
             Vertex v = obj.vertices[i];
 
@@ -118,10 +122,16 @@ public class Game extends JFrame implements Runnable {
             }
         }
 
-        for (int i = 0; i < numVertices; i++) {
+        /** for (int i = 0; i < numVertices; i++) {
             int next = (i + 1) % numVertices;
             if (inFront[i] && inFront[next]) {
                 drawLine(screenX[i], screenY[i], screenX[next], screenY[next], obj.color);
+            }
+        }**/
+
+        for (int i = 1; i < numVertices - 1; i++) {
+            if (inFront[0] && inFront[i] && inFront[i + 1]) {
+                fillTriangle(screenX[0], screenY[0], screenX[i], screenY[i], screenX[i + 1], screenY[i + 1], obj.color);
             }
         }
     }
@@ -150,13 +160,35 @@ public class Game extends JFrame implements Runnable {
         }
     }
 
-    private void clearBackground() {
-        int x,y;
-        for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-                pixel(x, y, 8);
+    // Der scheiß hat 1 1/2 stunden oder so gebraucht und ich check gefühlt nix ich kann nicht mehr (Scanline stuff)
+    private void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int color) {
+        if (y0 > y1) { int t; t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
+        if (y0 > y2) { int t; t = y0; y0 = y2; y2 = t; t = x0; x0 = x2; x2 = t; }
+        if (y1 > y2) { int t; t = y1; y1 = y2; y2 = t; t = x1; x1 = x2; x2 = t; }
+
+        int totalHeight = y2 - y0;
+
+        for (int i = 0; i < totalHeight; i++) {
+            boolean secondHalf = i > y1 - y0 || y1 == y0;
+            int segmentHeight = secondHalf ? y2 - y1 : y1 - y0;
+            float alpha = (float) i / totalHeight;
+            float beta = (float) (i - (secondHalf ? y1 - y0 : 0)) / segmentHeight;
+
+            int Ax = (int) (x0 + (x2 - x0) * alpha);
+            int Bx = secondHalf ? (int) (x1 + (x2 - x1) * beta) : (int) (x0 + (x1 - x0) * beta);
+
+            if (Ax > Bx) {
+                int t = Ax; Ax = Bx; Bx = t;
+            }
+
+            for (int j = Ax; j <= Bx; j++) {
+                pixel(j, y0 + i, color);
             }
         }
+    }
+
+    private void clearBackground() {
+        Arrays.fill(pixels, 0x003C82);
     }
 
     private void renderTextToPixels(String text, int x, int y, int color) {
@@ -192,20 +224,18 @@ public class Game extends JFrame implements Runnable {
     @Override
     public void run() {
         long lastTime = System.nanoTime();
-        double amountOfTicks = 60.0;
-        double ns = 1000000000 / amountOfTicks;
+        double nsPerTick = 1_000_000_000.0 / 60.0;
         double delta = 0;
-        long timer = System.currentTimeMillis();
-        int frames = 0;
+
         while (running) {
             long now = System.nanoTime();
-            delta += (now - lastTime) / ns;
+            delta += (now - lastTime) / nsPerTick;
             lastTime = now;
+
             while (delta >= 1) {
                 delta--;
                 camera.update();
                 clearBackground();
-                renderUI();
             }
             render();
         }
