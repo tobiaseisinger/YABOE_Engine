@@ -46,7 +46,11 @@ public class Game extends JFrame implements Runnable {
         }
     }
 
+    private int frameCounter = 0;
+
     public void render() {
+        frameCounter++;
+        System.out.println("Render Frame: " + frameCounter);
         BufferStrategy bs = getBufferStrategy();
         if (bs == null) {
             createBufferStrategy(3);
@@ -59,9 +63,11 @@ public class Game extends JFrame implements Runnable {
                 new Vertex(1, 1, 3),
                 new Vertex(-1, 1, 3)
         };
-        Object obj = new Object(cube, 2);
+        Object obj = new Object(cube, 2, new Texture("src/main/resources/brick.png"));
 
         renderObject(obj);
+
+        pixels[width / 2 + height / 2 * width] = 0xFF0000;
 
         Graphics g = bs.getDrawGraphics();
         g.drawImage(img, 0, 0, img.getWidth(), img.getHeight(), null);
@@ -71,24 +77,9 @@ public class Game extends JFrame implements Runnable {
     }
 
     private void pixel(int x, int y, int c) {
-        if (x < 0 || x >= width || y < 0 || y >= height) {
-            return;
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+            pixels[y * width + x] = c;
         }
-
-        int[][] colors = {
-                {255, 255, 0},   // Gelb
-                {160, 160, 0},   // Dunkelgelb
-                {0, 255, 0},     // Grün
-                {0, 160, 0},     // Dunkelgrün
-                {0, 255, 255},   // Cyan
-                {0, 160, 160},   // Dunkelcyan
-                {160, 100, 0},   // Braun
-                {110, 50, 0},    // Dunkelbraun
-                {0, 60, 130}     // Blau
-        };
-
-        int[] rgb = (c >= 0 && c < colors.length) ? colors[c] : new int[]{255, 255, 255};
-        pixels[y * width + x] = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
     }
 
     private void renderObject(Object obj) {
@@ -97,9 +88,10 @@ public class Game extends JFrame implements Runnable {
 
         int[] screenX = new int[numVertices];
         int[] screenY = new int[numVertices];
+        float[] texU = {0, 1, 1, 0};
+        float[] texV = {0, 0, 1, 1};
         boolean[] inFront = new boolean[numVertices];
 
-        // **Schritt 1: 3D -> 2D Transformation**
         for (int i = 0; i < numVertices; i++) {
             Vertex v = obj.vertices[i];
 
@@ -131,7 +123,35 @@ public class Game extends JFrame implements Runnable {
 
         for (int i = 1; i < numVertices - 1; i++) {
             if (inFront[0] && inFront[i] && inFront[i + 1]) {
-                fillTriangle(screenX[0], screenY[0], screenX[i], screenY[i], screenX[i + 1], screenY[i + 1], obj.color);
+                fillTexturedTriangle(screenX[0], screenY[0], texU[0], texV[0],
+                        screenX[i], screenY[i], texU[i], texV[i],
+                        screenX[i + 1], screenY[i + 1], texU[i + 1], texV[i + 1], obj.texture);
+            }
+        }
+    }
+
+    private void fillTexturedTriangle(int x0, int y0, float u0, float v0,
+                                      int x1, int y1, float u1, float v1,
+                                      int x2, int y2, float u2, float v2, Texture tex) {
+        int minX = Math.min(x0, Math.min(x1, x2));
+        int maxX = Math.max(x0, Math.max(x1, x2));
+        int minY = Math.min(y0, Math.min(y1, y2));
+        int maxY = Math.max(y0, Math.max(y1, y2));
+
+        float denom = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+        if (denom == 0) return;
+
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                float w0 = ((x1 - x) * (y2 - y) - (y1 - y) * (x2 - x)) / denom;
+                float w1 = ((x2 - x) * (y0 - y) - (y2 - y) * (x0 - x)) / denom;
+                float w2 = 1.0f - w0 - w1;
+
+                if (w0 >= 0 && w1 >= 0 && w2 >= 0) {  // Punkt ist innerhalb des Dreiecks
+                    float u = w0 * u0 + w1 * u1 + w2 * u2;
+                    float v = w0 * v0 + w1 * v1 + w2 * v2;
+                    pixel(x, y, tex.getPixel(u, v));
+                }
             }
         }
     }
@@ -227,17 +247,41 @@ public class Game extends JFrame implements Runnable {
         double nsPerTick = 1_000_000_000.0 / 60.0;
         double delta = 0;
 
+        long lastTimer = System.currentTimeMillis();
+        int frames = 0;
+
         while (running) {
             long now = System.nanoTime();
             delta += (now - lastTime) / nsPerTick;
             lastTime = now;
 
+            boolean shouldRender = false;
+
             while (delta >= 1) {
                 delta--;
                 camera.update();
                 clearBackground();
+                shouldRender = true;
             }
-            render();
+
+            if (shouldRender) {
+                render();
+                frames++;
+            }
+
+            // FPS Limit & Display
+            if (System.currentTimeMillis() - lastTimer >= 1000) {
+                System.out.println("FPS: " + frames);
+                lastTimer += 1000;
+                frames = 0;
+            }
+
+            try {
+                Thread.sleep(2); // Kleine Pause, um CPU-Auslastung zu reduzieren
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
+
 }
